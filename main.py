@@ -1,17 +1,9 @@
-import os
-from azure.servicebus.aio import ServiceBusClient
-from fastapi import FastAPI
 import asyncio
 import logging
+from fastapi import FastAPI
 from contextlib import asynccontextmanager
-from dotenv import load_dotenv
 
-# Load environment variables from .env file
-load_dotenv()
-
-# Load connection string and queue name from environment variables
-CONNECTION_STR = os.getenv("SERVICE_BUS_CONNECTION_STR")
-QUEUE_NAME = os.getenv("SERVICE_BUS_QUEUE_NAME")
+from message_bus import MessageBus
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -21,24 +13,22 @@ logger = logging.getLogger(__name__)
 messages = []
 
 
-async def receive_messages():
-    servicebus_client = ServiceBusClient.from_connection_string(conn_str=CONNECTION_STR)
-    async with servicebus_client:
-        receiver = servicebus_client.get_queue_receiver(queue_name=QUEUE_NAME)
-        async with receiver:
-            while True:
-                received_msgs = await receiver.receive_messages(max_message_count=10, max_wait_time=5)
-                for msg in received_msgs:
-                    messages.append(str(msg))
-                    await receiver.complete_message(msg)
-                    logger.info(f"Received and completed message: {msg}")
-                await asyncio.sleep(1)  # short delay before next poll
+async def receive_messages(message_bus):
+    while True:
+        await message_bus.start_consuming(service_callback_handler=process_message)
+        await asyncio.sleep(1)  # short delay before next poll
+
+
+async def process_message(msg):
+    messages.append(str(msg))
+    logger.info(f"Received and completed message: {msg}")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Start the background task
-    task = asyncio.create_task(receive_messages())
+    message_bus = MessageBus()
+    task = asyncio.create_task(receive_messages(message_bus))
     yield
     # Stop the background task
     task.cancel()
