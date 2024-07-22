@@ -9,8 +9,6 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-
-
 # Load connection string and queue name from environment variables
 CONNECTION_STR = os.getenv("SERVICE_BUS_CONNECTION_STR")
 QUEUE_NAME = os.getenv("SERVICE_BUS_QUEUE_NAME")
@@ -49,7 +47,9 @@ async def lifespan(app: FastAPI):
     except asyncio.CancelledError:
         pass
 
+
 app = FastAPI(lifespan=lifespan)
+
 
 @app.get("/")
 async def root():
